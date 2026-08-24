@@ -1,5 +1,7 @@
 # Setup Echo
 
+[![CI](https://github.com/echolang/setup-echo/actions/workflows/ci.yml/badge.svg)](https://github.com/echolang/setup-echo/actions/workflows/ci.yml)
+
 Every Echo library's CI was going to copy the same download, unpack, put-it-on-`PATH` dance. This action is that dance, once.
 
 It installs a released `echoc` and `epm` and leaves the rest of the job to you.
