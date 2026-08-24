@@ -57,6 +57,47 @@ jobs:
 
 Drop the extra `apt-get` step when the library has no native headers of its own.
 
+## Releasing a library
+
+The install action does not cut releases. That would fire from every CI matrix cell, which is a bad time.
+
+This repo also has a reusable workflow for that. It patch-bumps `#[version:]` in `module.eco`, opens a release PR, and when you merge that PR it tags `vX.Y.Z` and creates the GitHub release.
+
+```yaml
+name: release
+
+on:
+  push:
+    branches: [master, main]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release:
+    uses: echolang/setup-echo/.github/workflows/release.yml@v1
+    with:
+      changelog: true
+```
+
+Keep this out of the test workflow. Test workflows often cancel in-progress runs, and that is a bad moment to be tagging.
+
+`changelog: true` writes `CHANGELOG.md` on the release PR. Set it to `false` if you do not want that file. The GitHub release still happens.
+
+The version line in `module.eco` needs the marker release-please looks for:
+
+```echo
+#[version: "0.1.0"] // x-release-please-version
+```
+
+Without it, the tag moves and `#[version:]` does not.
+
+Under Settings, Actions, General, enable "Allow GitHub Actions to create and approve pull requests". The default `GITHUB_TOKEN` cannot open the release PR without that.
+
+To force a minor or major, put `Release-As: 0.2.0` in a commit body.
+
 ## Inputs
 
 | Input | Default | Meaning |

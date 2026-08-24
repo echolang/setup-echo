@@ -1,0 +1,91 @@
+name: release
+
+on:
+  workflow_call:
+    inputs:
+      changelog:
+        description: Write CHANGELOG.md on the release PR
+        type: boolean
+        default: true
+      target-branch:
+        description: Branch to open the release PR against. Defaults to the branch that triggered the caller.
+        type: string
+        required: false
+        default: ''
+    secrets:
+      token:
+        description: Token with contents and pull-request write. Defaults to github.token.
+        required: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Cut release PR and GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.token || github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ inputs.target-branch != '' && inputs.target-branch || github.ref_name }}
+          CHANGELOG: ${{ inputs.changelog }}
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          npm install --no-save release-please@17.11.1
+          node <<'EOF'
+          const { GitHub, Manifest } = require('release-please');
+
+          async function main() {
+            const token = process.env.GITHUB_TOKEN;
+            const repo = process.env.REPO;
+            const branch = process.env.BRANCH;
+            const changelog = process.env.CHANGELOG === 'true';
+            if (!token) {
+              throw new Error('GITHUB_TOKEN is missing');
+            }
+            if (!repo || !repo.includes('/')) {
+              throw new Error(`REPO must be owner/name, got ${repo}`);
+            }
+            if (!branch) {
+              throw new Error('BRANCH is missing');
+            }
+            const [owner, name] = repo.split('/');
+            const github = await GitHub.create({ owner, repo: name, token });
+            const config = {
+              releaseType: 'simple',
+              versioning: 'always-bump-patch',
+              extraFiles: [{ type: 'generic', path: 'module.eco' }],
+              includeVInTag: true,
+              includeComponentInTag: false,
+              skipChangelog: !changelog,
+            };
+            if (changelog) {
+              config.changelogType = 'github';
+            }
+            const manifest = await Manifest.fromConfig(github, branch, config);
+            const prs = await manifest.createPullRequests();
+            console.log('release pull requests:', JSON.stringify(prs, null, 2));
+            try {
+              const releases = await manifest.createReleases();
+              console.log('github releases:', JSON.stringify(releases, null, 2));
+            } catch (err) {
+              if (err && err.constructor && err.constructor.name === 'DuplicateReleaseError') {
+                console.log('no new github release to tag');
+                return;
+              }
+              throw err;
+            }
+          }
+
+          main().catch((err) => {
+            console.error(err);
+            process.exit(1);
+          });
+          EOF
