@@ -68,23 +68,25 @@ async function main() {
     pullRequestHeader: 'This PR bumps the patch.',
     pullRequestFooter: 'Merge it and the tag goes out.',
   };
-  if (changelog) {
-    config.changelogType = 'github';
-  }
 
   const manifest = await Manifest.fromConfig(github, branch, config);
-  const prs = await manifest.createPullRequests();
-  console.log('release pull requests:', JSON.stringify(prs, null, 2));
+
+  // Tag first. Opening the next PR before that treats the merged bump as
+  // already released, then dies generating notes against a tag that does
+  // not exist yet.
   try {
     const releases = await manifest.createReleases();
     console.log('github releases:', JSON.stringify(releases, null, 2));
   } catch (err) {
     if (err && err.constructor && err.constructor.name === 'DuplicateReleaseError') {
       console.log('no new github release to tag');
-      return;
+    } else {
+      throw err;
     }
-    throw err;
   }
+
+  const prs = await manifest.createPullRequests();
+  console.log('release pull requests:', JSON.stringify(prs, null, 2));
 }
 
 main().catch((err) => {
