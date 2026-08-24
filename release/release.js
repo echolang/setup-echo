@@ -41,6 +41,37 @@ commitMod.parseConventionalCommits = function parseWithFallback(commits, logger)
 
 const { GitHub, Manifest } = require('release-please');
 
+async function hasReleaseTag(github) {
+  for await (const tag of github.tagIterator()) {
+    if (tag && tag.name) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function patchBump(version) {
+  const match = String(version).match(/^(\d+)\.(\d+)\.(\d+)$/);
+  if (!match) {
+    return '0.1.0';
+  }
+  return `${match[1]}.${match[2]}.${parseInt(match[3], 10) + 1}`;
+}
+
+async function initialVersionFromModule(github, branch) {
+  try {
+    const file = await github.getFileContentsOnBranch('module.eco', branch);
+    const raw = file.parsedContent || '';
+    const match = String(raw).match(/#\[version:\s*"(\d+\.\d+\.\d+)"\]/);
+    if (match) {
+      return patchBump(match[1]);
+    }
+  } catch (_err) {
+    // no module.eco, fall through
+  }
+  return '0.1.0';
+}
+
 async function main() {
   const token = process.env.GITHUB_TOKEN;
   const repo = process.env.REPO;
@@ -68,6 +99,13 @@ async function main() {
     pullRequestHeader: 'This PR bumps the patch.',
     pullRequestFooter: 'Merge it and the tag goes out.',
   };
+
+  // No tags: release-please's simple strategy starts at 1.0.0. Echo libs
+  // already declare 0.1.0 in module.eco, so patch-bump that instead.
+  if (!(await hasReleaseTag(github))) {
+    config.initialVersion = await initialVersionFromModule(github, branch);
+    console.log(`no tags found, first release will be ${config.initialVersion}`);
+  }
 
   const manifest = await Manifest.fromConfig(github, branch, config);
 
