@@ -32,5 +32,6 @@ runs:
         CHANGELOG: ${{ inputs.changelog }}
       run: |
         set -euo pipefail
+        cp "${{ github.action_path }}/release.js" ./release.js
         npm install --no-save release-please@17.11.1
-        node "${{ github.action_path }}/release.js"
+        node ./release.js
