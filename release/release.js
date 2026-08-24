@@ -65,6 +65,8 @@ async function main() {
     includeVInTag: true,
     includeComponentInTag: false,
     skipChangelog: !changelog,
+    pullRequestHeader: 'This PR bumps the patch.',
+    pullRequestFooter: 'Merge it and the tag goes out.',
   };
   if (changelog) {
     config.changelogType = 'github';
