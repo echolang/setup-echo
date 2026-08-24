@@ -85,8 +85,26 @@ async function main() {
     }
   }
 
-  const prs = await manifest.createPullRequests();
-  console.log('release pull requests:', JSON.stringify(prs, null, 2));
+  try {
+    const prs = await manifest.createPullRequests();
+    console.log('release pull requests:', JSON.stringify(prs, null, 2));
+  } catch (err) {
+    const apiMessage =
+      err && err.response && err.response.data && err.response.data.message;
+    if (
+      err &&
+      err.status === 403 &&
+      String(apiMessage).includes('not permitted to create or approve pull requests')
+    ) {
+      console.error(
+        'GitHub Actions cannot open pull requests in this organization.\n' +
+          'Org Settings > Actions > General > Allow GitHub Actions to create and approve pull requests.\n' +
+          'The release branch was still updated: release-please--branches--master'
+      );
+      process.exit(1);
+    }
+    throw err;
+  }
 }
 
 main().catch((err) => {
