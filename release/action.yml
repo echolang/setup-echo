@@ -1,0 +1,36 @@
+name: Release Echo library
+description: Patch-bump module.eco, open a release PR, and tag a GitHub release
+
+inputs:
+  changelog:
+    description: Write CHANGELOG.md on the release PR
+    required: false
+    default: 'true'
+  target-branch:
+    description: Branch to open the release PR against. Defaults to the branch that triggered the caller.
+    required: false
+    default: ''
+  token:
+    description: GitHub token with contents and pull-request write
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v5
+      with:
+        node-version: '22'
+
+    - name: Cut release PR and GitHub release
+      shell: bash
+      working-directory: ${{ runner.temp }}
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+        REPO: ${{ github.repository }}
+        BRANCH: ${{ inputs.target-branch != '' && inputs.target-branch || github.ref_name }}
+        CHANGELOG: ${{ inputs.changelog }}
+      run: |
+        set -euo pipefail
+        npm install --no-save release-please@17.11.1
+        node "${{ github.action_path }}/release.js"
