@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pinned:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, ubuntu-24.04, windows-2022]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Echo
+        uses: ./
+        with:
+          version: v0.3.0
+
+      - name: Run a one-liner
+        shell: bash
+        run: |
+          printf "echo 'ok';\n" > hello.eco
+          echoc run hello.eco
+
+      - name: Native build
+        shell: bash
+        run: echoc build -o hello hello.eco
+
+  latest:
+    name: latest (ubuntu)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Echo
+        id: echo
+        uses: ./
+        with:
+          version: latest
+
+      - name: Resolved a concrete tag
+        shell: bash
+        run: |
+          echo "resolved ${{ steps.echo.outputs.version }}"
+          case "${{ steps.echo.outputs.version }}" in
+            v*) ;;
+            *)
+              echo "expected a v-prefixed tag, got ${{ steps.echo.outputs.version }}" >&2
+              exit 1
+              ;;
+          esac
+          echoc --version
+          epm --version

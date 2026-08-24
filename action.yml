@@ -1,0 +1,83 @@
+name: Setup Echo
+description: Download a released Echo toolchain (echoc and epm) and put it on PATH
+author: echolang
+
+branding:
+  icon: package
+  color: purple
+
+inputs:
+  version:
+    description: Echo release tag (v0.3.0 or 0.3.0) or `latest`
+    required: false
+    default: latest
+  cache:
+    description: Cache the downloaded release archive
+    required: false
+    default: "true"
+  token:
+    description: GitHub token used only to resolve `latest`
+    required: false
+    default: ${{ github.token }}
+  install-clang:
+    description: Install clang on Linux so `echoc build` can link
+    required: false
+    default: "true"
+
+outputs:
+  version:
+    description: Resolved Echo release tag
+    value: ${{ steps.resolve.outputs.version }}
+  echo-dir:
+    description: Directory containing echoc and epm
+    value: ${{ steps.install-unix.outputs.echo-dir || steps.install-windows.outputs.echo-dir }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve Echo version
+      id: resolve
+      shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_TOKEN: ${{ inputs.token }}
+      run: bash "${{ github.action_path }}/scripts/resolve.sh"
+
+    - name: Cache Echo archive
+      if: inputs.cache == 'true'
+      uses: actions/cache@v4
+      with:
+        path: ${{ runner.temp }}/echo-dl
+        key: echo-${{ runner.os }}-${{ runner.arch }}-${{ steps.resolve.outputs.version }}
+
+    - name: Install Echo (Unix)
+      id: install-unix
+      if: runner.os != 'Windows'
+      shell: bash
+      env:
+        ECHO_VERSION: ${{ steps.resolve.outputs.version }}
+        ECHO_ASSET: ${{ steps.resolve.outputs.asset }}
+      run: bash "${{ github.action_path }}/scripts/install.sh"
+
+    - name: Install Echo (Windows)
+      id: install-windows
+      if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        ECHO_VERSION: ${{ steps.resolve.outputs.version }}
+        ECHO_ASSET: ${{ steps.resolve.outputs.asset }}
+      run: |
+        & "${{ github.action_path }}/scripts/install.ps1"
+
+    - name: Install clang (Linux)
+      if: runner.os == 'Linux' && inputs.install-clang == 'true'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang
+
+    - name: Toolchain versions
+      shell: bash
+      run: |
+        echoc --version
+        epm --version
