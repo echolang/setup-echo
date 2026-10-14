@@ -36,9 +36,14 @@ jobs:
         shell: bash
         run: echoc build -o hello hello.eco
 
+  # the pinned v0.3.0 predates linux arm64 archives, so arm only runs here
   latest:
-    name: latest (ubuntu)
-    runs-on: ubuntu-24.04
+    name: latest (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
     steps:
       - uses: actions/checkout@v5
 

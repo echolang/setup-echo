@@ -16,6 +16,7 @@ if [ -z "${RUNNER_OS:-}" ] || [ -z "${RUNNER_ARCH:-}" ]; then
     case "$(uname -s)-$(uname -m)" in
         Darwin-arm64)  RUNNER_OS=macOS;   RUNNER_ARCH=ARM64 ;;
         Linux-x86_64)  RUNNER_OS=Linux;   RUNNER_ARCH=X64 ;;
+        Linux-aarch64) RUNNER_OS=Linux;   RUNNER_ARCH=ARM64 ;;
         MINGW*|MSYS*|CYGWIN*)
             echo "echo: resolve.sh needs RUNNER_OS/RUNNER_ARCH on Windows." >&2
             exit 1
@@ -31,6 +32,7 @@ fi
 case "${RUNNER_OS}-${RUNNER_ARCH}" in
     macOS-ARM64)   asset="echo-macos-arm64.tar.gz" ;;
     Linux-X64)     asset="echo-linux-x86_64.tar.gz" ;;
+    Linux-ARM64)   asset="echo-linux-arm64.tar.gz" ;;
     Windows-X64)   asset="echo-windows-x86_64.zip" ;;
     *)
         echo "echo: no prebuilt Echo for ${RUNNER_OS} ${RUNNER_ARCH}." >&2

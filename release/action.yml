@@ -10,10 +10,25 @@ inputs:
     description: Branch to open the release PR against. Defaults to the branch that triggered the caller.
     required: false
     default: ''
+  extra-files:
+    description: More files whose `x-release-please-version` line is bumped with module.eco, one per line or comma separated
+    required: false
+    default: ''
   token:
     description: GitHub token with contents and pull-request write
     required: false
     default: ${{ github.token }}
+
+outputs:
+  release-created:
+    description: '`true` when this run tagged a new GitHub release'
+    value: ${{ steps.release.outputs.release-created }}
+  tag-name:
+    description: The tag of that release, e.g. v0.1.3. Empty when none was created.
+    value: ${{ steps.release.outputs.tag-name }}
+  version:
+    description: The version of that release, e.g. 0.1.3. Empty when none was created.
+    value: ${{ steps.release.outputs.version }}
 
 runs:
   using: composite
@@ -23,6 +38,7 @@ runs:
         node-version: '22'
 
     - name: Cut release PR and GitHub release
+      id: release
       shell: bash
       working-directory: ${{ runner.temp }}
       env:
@@ -30,6 +46,7 @@ runs:
         REPO: ${{ github.repository }}
         BRANCH: ${{ inputs.target-branch != '' && inputs.target-branch || github.ref_name }}
         CHANGELOG: ${{ inputs.changelog }}
+        EXTRA_FILES: ${{ inputs.extra-files }}
       run: |
         set -euo pipefail
         cp "${{ github.action_path }}/release.js" ./release.js

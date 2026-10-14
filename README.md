@@ -43,7 +43,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15, ubuntu-24.04, windows-2022]
+        os: [macos-15, ubuntu-24.04, ubuntu-24.04-arm, windows-2022]
     steps:
       - uses: actions/checkout@v5
       - uses: echolang/setup-echo@v1
@@ -98,6 +98,53 @@ Under Settings, Actions, General, enable "Allow GitHub Actions to create and app
 
 To force a minor or major, put `Release-As: 0.2.0` in a commit body.
 
+### Other files that carry the version
+
+A tool that prints its own version has it twice: in `module.eco` and in the code. Mark that line too and name the file in `extra-files`:
+
+```echo
+command::Command $app = command::Command('ecodoc', '0.1.0', '...'); // x-release-please-version
+```
+
+```yaml
+    with:
+      extra-files: main.eco
+```
+
+One path per line, or comma separated. The release PR bumps them together with `module.eco`.
+
+### After the release
+
+A release cut with the default `GITHUB_TOKEN` does not fire `on: release`, and its tag does not fire `on: push: tags`. GitHub does that on purpose so workflows cannot trigger each other in a loop. So a job that needs the new release, say to attach binaries, hangs off the reusable workflow's outputs instead:
+
+| Output | Meaning |
+|---|---|
+| `release-created` | `true` when this run tagged a new release |
+| `tag-name` | Its tag, `v0.1.3`. Empty when nothing was released. |
+| `version` | Its version, `0.1.3`. Empty when nothing was released. |
+
+```yaml
+jobs:
+  release:
+    uses: echolang/setup-echo/.github/workflows/release.yml@v1
+
+  binaries:
+    needs: release
+    if: needs.release.outputs.release-created == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.release.outputs.tag-name }}
+      - uses: echolang/setup-echo@v1
+      - run: echoc build --release -o app
+      - run: gh release upload "${{ needs.release.outputs.tag-name }}" app
+        env:
+          GH_TOKEN: ${{ github.token }}
+```
+
+Most runs release nothing: they only update the release PR. `release-created` is `false` then and the job is skipped.
+
 ## Inputs
 
 | Input | Default | Meaning |
@@ -130,6 +177,7 @@ Same list as the [Echo installers](https://github.com/echolang/echo):
 |---|---|
 | macOS arm64 | `echo-macos-arm64.tar.gz` |
 | Linux x86_64 | `echo-linux-x86_64.tar.gz` |
+| Linux arm64 | `echo-linux-arm64.tar.gz` |
 | Windows x86_64 | `echo-windows-x86_64.zip` |
 
 Anything else fails with a message telling you to build from source. The action does not compile the compiler.

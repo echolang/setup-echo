@@ -39,7 +39,32 @@ commitMod.parseConventionalCommits = function parseWithFallback(commits, logger)
   return parsed;
 };
 
+const fs = require('fs');
 const { GitHub, Manifest } = require('release-please');
+
+// what a caller's next job needs to attach files to the release just cut.
+// a release made with GITHUB_TOKEN fires no `release` event, so this is
+// the only way that job hears about it.
+function writeOutputs(release) {
+  const lines = [
+    `release-created=${release ? 'true' : 'false'}`,
+    `tag-name=${release ? release.tagName : ''}`,
+    `version=${release ? release.version : ''}`,
+  ];
+  console.log(lines.join('\n'));
+  if (process.env.GITHUB_OUTPUT) {
+    fs.appendFileSync(process.env.GITHUB_OUTPUT, lines.join('\n') + '\n');
+  }
+}
+
+// more files carrying `x-release-please-version`, one per line or comma
+function extraFiles() {
+  return String(process.env.EXTRA_FILES || '')
+    .split(/[\n,]/)
+    .map((p) => p.trim())
+    .filter((p) => p !== '' && p !== 'module.eco')
+    .map((path) => ({ type: 'generic', path }));
+}
 
 async function hasReleaseTag(github) {
   for await (const tag of github.tagIterator()) {
@@ -92,7 +117,7 @@ async function main() {
   const config = {
     releaseType: 'simple',
     versioning: 'always-bump-patch',
-    extraFiles: [{ type: 'generic', path: 'module.eco' }],
+    extraFiles: [{ type: 'generic', path: 'module.eco' }, ...extraFiles()],
     includeVInTag: true,
     includeComponentInTag: false,
     skipChangelog: !changelog,
@@ -115,9 +140,11 @@ async function main() {
   try {
     const releases = await manifest.createReleases();
     console.log('github releases:', JSON.stringify(releases, null, 2));
+    writeOutputs((releases || []).find((r) => r && r.tagName));
   } catch (err) {
     if (err && err.constructor && err.constructor.name === 'DuplicateReleaseError') {
       console.log('no new github release to tag');
+      writeOutputs(null);
     } else {
       throw err;
     }
